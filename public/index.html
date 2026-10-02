@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="Sala de bingo en línea: canta los números, reparte cartones e imprímelos en PDF."><title>BingoClub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@500&display=swap">
+<style>
+/* Concepto: sala de bingo de barrio. Bolas de colores por decena, cartones de 90 bolas (3 filas x 9 columnas), panel de anfitrión y vista de jugador. */
+:root{
+  --bg:#edf0f6; --surface:#ffffff; --surface2:#f5f7fb; --ink:#131c36; --muted:#566285; --line:#d6dcea; --accent:#e0344f; --on-accent:#ffffff;
+  --teal:#0b8a7c; --on-teal:#ffffff; --gold:#f2b134; --on-gold:#2b1d00;
+  --shadow:0 1px 2px rgba(19,28,54,.06),0 6px 20px rgba(19,28,54,.06);
+  --f-display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --f-body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1326; --surface:#161d38; --surface2:#1d2646; --ink:#eaeefb; --muted:#9aa6c7; --line:#2b3560;
+  --accent:#ff5d77; --on-accent:#1b0710; --teal:#2bc4b0; --on-teal:#04201c; --gold:#f6c453; --on-gold:#2b1d00;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1326; --surface:#161d38; --surface2:#1d2646; --ink:#eaeefb; --muted:#9aa6c7; --line:#2b3560;
+  --accent:#ff5d77; --on-accent:#1b0710; --teal:#2bc4b0; --on-teal:#04201c; --gold:#f6c453; --on-gold:#2b1d00;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);padding-inline:16px;padding-block:0 40px}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{font-family:var(--f-display);line-height:1.1;margin:0;text-wrap:balance}
+.wrap{max-width:1080px;margin-inline:auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:12px 10px;border-bottom:1px solid var(--line);margin-inline:-16px;padding-inline:16px}
+.top .wrap{display:flex;gap:12px 20px;align-items:center;flex-wrap:wrap}
+.brand{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.brand i{width:22px;height:22px;border-radius:50%;background:var(--accent);display:inline-block;box-shadow:inset 0 0 0 5px var(--surface),0 0 0 2px var(--accent)}
+nav{display:flex;gap:4px;overflow-x:auto;min-width:0;flex:1 1 auto;scrollbar-width:none}
+nav button{border:0;background:transparent;padding:8px 14px;border-radius:999px;cursor:pointer;font-weight:700;color:var(--muted);white-space:nowrap}
+nav button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+nav button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.who{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center}
+.who button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;cursor:pointer;font-size:12px}
+main{padding-block:22px}
+.hero{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:end;justify-content:space-between;margin-bottom:18px}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.hero h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.03em}
+.layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}}
+.col{display:grid;gap:18px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);min-width:0}
+.panel h2{font-size:20px;font-weight:800;margin-bottom:12px}
+.panel h3{font-size:16px;font-weight:800;margin-bottom:8px}
+.flat{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.live{display:grid;grid-template-columns:auto minmax(0,1fr);gap:20px;align-items:center}
+@media(max-width:480px){.live{grid-template-columns:minmax(0,1fr);justify-items:center;text-align:center}}
+.ball{--h:200;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-family:var(--f-mono);font-weight:500;font-size:17px;color:#fff;background:radial-gradient(circle at 32% 28%,hsl(var(--h) 85% 68%),hsl(var(--h) 70% 44%) 62%,hsl(var(--h) 70% 34%));box-shadow:0 2px 6px rgba(0,0,0,.25);position:relative;flex:none}
+.ball::after{content:"";position:absolute;inset:22% 22%;border-radius:50%;background:rgba(255,255,255,.9);z-index:0}
+.ball span{position:relative;z-index:1;color:#131c36;font-weight:700}
+.ball.big{width:150px;height:150px;font-size:60px}
+.ball.big::after{inset:20%}
+.ball.big span{font-size:54px;font-family:var(--f-display);font-weight:800;letter-spacing:-.03em}
+.ball.empty{background:var(--surface2);box-shadow:inset 0 0 0 2px var(--line);}
+.ball.empty::after{display:none}
+.ball.empty span{color:var(--muted)}
+.word{font-family:var(--f-display);font-size:26px;font-weight:800;letter-spacing:-.02em}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border-radius:999px;padding:3px 10px;background:var(--surface2);border:1px solid var(--line);color:var(--muted)}
+.pill.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.pill.on::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.hist{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hist .ball{width:40px;height:40px;font-size:15px}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:700;cursor:pointer;min-height:40px}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.teal{background:var(--teal);border-color:var(--teal);color:var(--on-teal)}
+.btn.small{padding:5px 10px;min-height:32px;font-size:13px}
+.btn.danger{border-color:var(--accent);color:var(--accent)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+label.f{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px;width:100%;min-width:0;color:var(--ink)}
+textarea{min-height:110px;resize:vertical}
+.form{display:grid;gap:12px}
+.row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.board{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:5px}
+.board span{aspect-ratio:1;display:grid;place-items:center;border-radius:8px;font-family:var(--f-mono);font-size:clamp(11px,2.8vw,15px);background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+.board span.on{color:#131c36;font-weight:700;border-color:transparent;background:hsl(var(--h) 80% 62%)}
+.board span.last{outline:3px solid var(--ink);outline-offset:1px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.stat{display:flex;gap:6px 14px;flex-wrap:wrap}
+.stat div{flex:1 1 90px}
+.stat b{display:block;font-family:var(--f-display);font-size:30px;font-weight:800;line-height:1}
+.stat small{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.list li{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);min-width:0}
+.list .nm{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip{font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 6px;background:var(--surface)}
+.muted{color:var(--muted)}
+.note{font-size:13px;color:var(--muted)}
+.cartones{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px}
+.carton{background:var(--surface);border:2px solid var(--ink);border-radius:12px;padding:10px;box-shadow:var(--shadow);min-width:0}
+.carton.is-line{border-color:var(--gold)}
+.carton.is-bingo{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent)}
+.carton header{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px}
+.carton .cn{font-family:var(--f-display);font-weight:800;font-size:16px;letter-spacing:.02em;text-transform:uppercase}
+.carton .ow{font-size:12px;color:var(--muted);overflow-wrap:anywhere;text-align:right}
+.cgrid{display:grid;gap:3px}
+.crow{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;padding:2px;border-radius:6px}
+.crow.done{background:var(--gold)}
+.cell{aspect-ratio:1/1.05;display:grid;place-items:center;font-family:var(--f-mono);font-size:clamp(13px,3.6vw,18px);border:1px solid var(--line);border-radius:5px;background:var(--surface);min-width:0}
+.cell.empty{background:repeating-linear-gradient(135deg,var(--surface2) 0 4px,var(--line) 4px 5px);border-color:transparent}
+.cell.on{background:var(--teal);color:var(--on-teal);border-color:var(--teal);font-weight:700}
+.cell.last{outline:3px solid var(--accent);outline-offset:-1px}
+.carton footer{margin-top:8px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.carton .st{font-weight:700;color:var(--ink)}
+.banner{border-radius:12px;padding:14px 16px;background:var(--gold);color:var(--on-gold);font-weight:700;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.empty-state{text-align:center;padding:36px 16px;display:grid;gap:10px;justify-items:center}
+.empty-state h2{margin:0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;font-size:14px;max-width:calc(100% - 32px);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;text-align:center}
+#toast.show{opacity:1}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+.ball.pop{animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.4) rotate(-40deg);opacity:0}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.ball.pop{animation:none}}
+.sep{height:1px;background:var(--line);margin-block:14px}
+body{margin:0}[hidden]{display:none!important}
+</style></head><body>
+
+<header class="top"><div class="wrap">
+  <div class="brand"><i></i>BingoClub</div>
+  <nav id="tabs" role="tablist" aria-label="Secciones"></nav>
+  <div class="who" id="who"></div>
+</div></header>
+<main class="wrap" id="panel" aria-live="polite"></main>
+<div id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+"use strict";
+/* ---------- utilidades ---------- */
+const $=(s,r)=> (r||document).querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
+const pad=n=>String(n).padStart(3,"0");
+const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+const HUES=[352,24,46,140,175,205,235,275,312];
+const hue=n=>HUES[Math.min(8,n<10?0:Math.floor(n/10))];
+const U=["cero","uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez","once","doce","trece","catorce","quince","dieciséis","diecisiete","dieciocho","diecinueve","veinte","veintiuno","veintidós","veintitrés","veinticuatro","veinticinco","veintiséis","veintisiete","veintiocho","veintinueve"];
+const D=["","","","treinta","cuarenta","cincuenta","sesenta","setenta","ochenta","noventa"];
+function words(n){const w=n<30?U[n]:D[Math.floor(n/10)]+(n%10?" y "+U[n%10]:"");return w.charAt(0).toUpperCase()+w.slice(1)}
+function rand(n){const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("show"),3200)}
+
+/* ---------- cartones (90 bolas, 3x9, 15 números) ---------- */
+function rng(seed){let s=seed|0;return function(){s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const SUBS={1:[[0],[1],[2]],2:[[0,1],[0,2],[1,2]],3:[[0,1,2]]};
+const cache=new Map();
+function makeCard(seed,id){
+  const key=seed+":"+id; if(cache.has(key))return cache.get(key);
+  const r=rng((seed^Math.imul(id,0x9E3779B1))>>>0); r();r();
+  let layout=null;
+  for(let tries=0;tries<4000&&!layout;tries++){
+    const counts=Array(9).fill(1);let extra=6;
+    while(extra>0){const c=Math.floor(r()*9);if(counts[c]<3){counts[c]++;extra--}}
+    const used=[0,0,0],pick=[];let ok=true;
+    for(let c=0;c<9&&ok;c++){
+      const opts=SUBS[counts[c]].filter(s=>s.every(x=>used[x]<5));
+      if(!opts.length){ok=false;break}
+      const s=opts[Math.floor(r()*opts.length)];s.forEach(x=>used[x]++);pick.push(s);
+    }
+    if(ok&&used.every(u=>u===5))layout=pick;
+  }
+  const rows=[Array(9).fill(0),Array(9).fill(0),Array(9).fill(0)];
+  layout.forEach((rowsOfCol,c)=>{
+    const lo=c===0?1:c*10,hi=c===8?90:c*10+9,pool=[];for(let n=lo;n<=hi;n++)pool.push(n);
+    const chosen=[];for(let k=0;k<rowsOfCol.length;k++){chosen.push(pool.splice(Math.floor(r()*pool.length),1)[0])}
+    chosen.sort((a,b)=>a-b);rowsOfCol.forEach((row,i)=>{rows[row][c]=chosen[i]});
+  });
+  cache.set(key,rows);return rows;
+}
+function evalCard(rows,called){
+  let total=0,best=0,line=false;
+  rows.forEach(row=>{let h=0;row.forEach(n=>{if(n&&called.has(n))h++});total+=h;best=Math.max(best,h);if(h===5)line=true});
+  return {line,bingo:total===15,missing:15-total,lineLeft:5-best,rowDone:rows.map(row=>row.every(n=>!n||called.has(n)))};
+}
+
+/* ---------- estado y almacenamiento ---------- */
+let S=null;               // estado de la partida
+let REMOTE=false,DL=null,HOSTKEY="",showLogin=false,lastWho=null;
+let isHost=false,asPlayer=false,ready=false;
+let tab=lsGet("bingo.tab","sala");
+let writing=0,queue=Promise.resolve(),seenCalled=-1,seenPrizes=-1;
+let voiceOn=lsGet("bingo.voice",null);
+let autoTimer=null,autoSecs=lsGet("bingo.autosecs",8);
+let confirmKey=null,shown=12,cardQuery="",pending=null;
+const LOCAL_KEY="bingo.local.v1";
+
+function newState(title,count){
+  return {v:1,title:title||"Bingo de la familia",seed:(rand(2147483647)||1),count:count,called:[],players:[],stage:"linea",prizes:[],finished:false,t:Date.now()};
+}
+function save(){
+  S.t=Date.now();
+  if(!REMOTE){lsSet(LOCAL_KEY,S);return}
+  const body=JSON.stringify(S);
+  writing++;
+  queue=queue.then(()=>fetch("/api/game",{method:"POST",headers:{"content-type":"application/json","x-host-key":HOSTKEY},body:body}).then(r=>{if(!r.ok)throw new Error(r.status===401?"clave de anfitrión incorrecta":"error "+r.status)})).catch(e=>toast("No se pudo guardar: "+(e&&e.message||"error"))).then(()=>{writing--});
+}
+function commit(){save();render()}
+
+/* ---------- derivados ---------- */
+const calledSet=()=>new Set(S?S.called:[]);
+function ownerOf(id){if(!S)return null;const p=S.players.find(p=>p.cards.indexOf(id)>-1);return p?p.name:null}
+function assignedIds(){const a=new Set();S.players.forEach(p=>p.cards.forEach(c=>a.add(c)));return a}
+function myIds(){
+  if(!S)return [];
+  const m=lsGet("bingo.mine",{name:"",nums:""});const ids=new Set();const q=norm(m.name);
+  if(q)S.players.forEach(p=>{if(norm(p.name)===q||norm(p.name).startsWith(q+" ")||norm(p.name).split(" ")[0]===q&&q.indexOf(" ")<0&&S.players.filter(x=>norm(x.name).split(" ")[0]===q).length===1)p.cards.forEach(c=>ids.add(c))});
+  String(m.nums||"").split(/[^0-9]+/).forEach(x=>{const n=parseInt(x,10);if(n>=1&&n<=S.count)ids.add(n)});
+  return [...ids].sort((a,b)=>a-b);
+}
+
+/* ---------- voz ---------- */
+function say(n){
+  if(!voiceOn||!("speechSynthesis" in window))return;
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(words(n)+(n>9?". "+String(n).split("").join(", "):""));u.lang="es-CO";u.rate=.9;speechSynthesis.speak(u)}catch(e){}
+}
+
+/* ---------- acciones del anfitrión ---------- */
+function draw(){
+  if(!S||S.finished)return false;
+  const left=[];for(let n=1;n<=90;n++)if(S.called.indexOf(n)<0)left.push(n);
+  if(!left.length){stopAuto();return false}
+  const n=left[rand(left.length)];S.called.push(n);commit();say(n);
+  if(S.called.length>=90)stopAuto();
+  return true;
+}
+function stopAuto(){if(autoTimer){clearInterval(autoTimer);autoTimer=null}}
+function startAuto(){stopAuto();autoTimer=setInterval(()=>{if(!draw())stopAuto();else render(true)},autoSecs*1000);draw()}
+function allocate(count){
+  const used=assignedIds(),out=[];
+  for(let n=1;n<=S.count&&out.length<count;n++)if(!used.has(n))out.push(n);
+  while(out.length<count){S.count++;out.push(S.count)}
+  return out;
+}
+function addPlayers(text,per){
+  const names=text.split(/\n|,|;/).map(s=>s.trim()).filter(Boolean);
+  names.forEach(nm=>{S.players.push({id:"p"+Date.now().toString(36)+rand(1e6).toString(36),name:nm,cards:allocate(per)})});
+  return names.length;
+}
+function declare(cardId){
+  const name=ownerOf(cardId)||"Sin nombre";
+  S.prizes.push({stage:S.stage,card:cardId,name:name});
+  if(S.stage==="linea")S.stage="bingo";else{S.finished=true;stopAuto()}
+  commit();toast("Premio registrado: "+name);
+}
+function resetNumbers(){stopAuto();S.called=[];S.prizes=[];S.stage="linea";S.finished=false;seenCalled=0;seenPrizes=0;commit()}
+function newCards(){stopAuto();S.seed=rand(2147483647)||1;cache.clear();resetNumbers()}
+
+/* ---------- PDF ---------- */
+async function pdfFor(ids,name){
+  if(!ids.length){toast("No hay cartones para imprimir");return}
+  if(!window.jspdf){toast("No se pudo cargar el generador de PDF");return}
+  if(!DL){toast("La descarga no está disponible en esta vista");return}
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"});
+  const W=210,M=12,cw=(W-2*M)/9,chh=13.5,pitch=69,per=4;
+  ids.forEach((id,i)=>{
+    if(i>0&&i%per===0)doc.addPage();
+    const y0=9+(i%per)*pitch,rows=makeCard(S.seed,id);
+    doc.setFillColor(224,52,79);doc.roundedRect(M,y0,W-2*M,9,1.5,1.5,"F");
+    doc.setTextColor(255,255,255);doc.setFont("helvetica","bold");doc.setFontSize(13);
+    doc.text("BINGO",M+3,y0+6.3);
+    doc.setFontSize(11);doc.text("Cartón N.º "+pad(id),W-M-3,y0+6.3,{align:"right"});
+    doc.setFontSize(9);doc.text(String(S.title).slice(0,48),W/2,y0+6.1,{align:"center"});
+    const owner=ownerOf(id);
+    doc.setTextColor(19,28,54);doc.setFont("helvetica","normal");doc.setFontSize(9);
+    doc.text(owner?"Jugador: "+owner:"Sin repartir",M,y0+13.3);
+    const gy=y0+15;
+    doc.setDrawColor(19,28,54);doc.setLineWidth(.3);
+    rows.forEach((row,r)=>row.forEach((n,c)=>{
+      const x=M+c*cw,y=gy+r*chh;
+      if(n){doc.setFillColor(255,255,255);doc.rect(x,y,cw,chh,"FD");doc.setFont("helvetica","bold");doc.setFontSize(17);doc.setTextColor(19,28,54);doc.text(String(n),x+cw/2,y+chh/2+2.8,{align:"center"})}
+      else{doc.setFillColor(214,220,234);doc.rect(x,y,cw,chh,"FD")}
+    }));
+    doc.setLineWidth(.7);doc.rect(M,gy,9*cw,3*chh);
+    doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(86,98,133);
+    doc.text("15 números · Línea = una fila completa · Bingo = el cartón completo",M,gy+3*chh+4.5);
+    if(i%per<per-1&&i<ids.length-1){doc.setDrawColor(150,160,185);doc.setLineWidth(.2);doc.setLineDashPattern([1.5,1.5],0);doc.line(M,y0+pitch-4,W-M,y0+pitch-4);doc.setLineDashPattern([],0)}
+  });
+  try{await DL.save({filename:name+".pdf",data:doc.output("blob")});toast("PDF listo")}
+  catch(e){if(!e||e.code!=="declined")toast("No se pudo descargar el PDF")}
+}
+async function csvReparto(){
+  if(!DL){toast("La descarga no está disponible en esta vista");return}
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const lines=["Jugador,Cartones"].concat(S.players.map(p=>q(p.name)+","+q(p.cards.map(pad).join(" "))));
+  try{await DL.save({filename:"reparto-bingo.csv",data:"﻿"+lines.join("\n")})}catch(e){}
+}
+
+/* ---------- vistas ---------- */
+function ballHTML(n,cls){return n?`<div class="ball ${cls||""}" style="--h:${hue(n)}"><span>${n}</span></div>`:`<div class="ball ${cls||""} empty"><span>–</span></div>`}
+function stageLabel(){return S.finished?"Partida terminada":(S.stage==="linea"?"Premio en juego: línea":"Premio en juego: bingo")}
+
+function cardHTML(id){
+  const rows=makeCard(S.seed,id),cs=calledSet(),ev=evalCard(rows,cs),last=S.called[S.called.length-1];
+  const body=rows.map((row,ri)=>`<div class="crow${ev.rowDone[ri]?" done":""}">`+row.map(n=>n?`<span class="cell${cs.has(n)?" on":""}${n===last?" last":""}">${n}</span>`:`<span class="cell empty"></span>`).join("")+`</div>`).join("");
+  const st=ev.bingo?"¡BINGO!":ev.line?"¡Línea!":"Sigue jugando";
+  return `<article class="carton${ev.bingo?" is-bingo":ev.line?" is-line":""}"><header><span class="cn">Cartón ${pad(id)}</span><span class="ow">${esc(ownerOf(id)||"Sin repartir")}</span></header><div class="cgrid">${body}</div><footer><span class="st">${st}</span><span>Línea: ${ev.line?"completa":"faltan "+ev.lineLeft} · Bingo: faltan ${ev.missing}</span></footer></article>`;
+}
+
+function setupHTML(){
+  if(!isHost)return `<div class="panel empty-state"><div class="ball big empty"><span>?</span></div><h2>La sala aún no abre</h2><p class="muted">El anfitrión todavía no ha creado la partida. Esta página se actualiza sola cuando empiece.</p></div>`;
+  return `<div class="hero"><div><div class="eyebrow">Nueva sala</div><h1>Crea tu partida de bingo</h1></div></div>
+  <div class="panel" style="max-width:560px"><form class="form" id="f-create">
+    <label class="f">Nombre de la partida<input type="text" id="c-title" value="Bingo de la familia" maxlength="48"></label>
+    <label class="f">Cartones disponibles<input type="number" id="c-count" value="30" min="1" max="300"></label>
+    <p class="note">Cada cartón tiene 15 números (3 filas, 9 columnas) del 1 al 90. Después podrás repartirlos por nombre y sacar el PDF para imprimir.</p>
+    <div><button class="btn primary" type="submit">Crear sala</button></div></form></div>`;
+}
+
+function salaHTML(){
+  if(!S)return setupHTML();
+  const last=S.called[S.called.length-1],cs=calledSet();
+  const recent=S.called.slice(-7,-1).reverse();
+  const left=90-S.called.length;
+  const live=S.called.length>0&&!S.finished;
+  let ctrl="";
+  if(isHost&&!asPlayer){
+    ctrl=`<div class="ctrl">
+      <button class="btn primary" data-act="draw"${S.finished||left===0?" disabled":""}>Cantar número</button>
+      <button class="btn${autoTimer?" teal":""}" data-act="auto"${S.finished||left===0?" disabled":""}>${autoTimer?"Pausar automático":"Modo automático"}</button>
+      <label class="f" style="display:flex;align-items:center;gap:6px;font-weight:500"><span>cada</span><select id="auto-secs" style="width:auto">${[5,8,10,15,20].map(s=>`<option value="${s}"${s===autoSecs?" selected":""}>${s} s</option>`).join("")}</select></label>
+      <button class="btn" data-act="undo"${S.called.length?"":" disabled"}>Deshacer último</button></div>`;
+  }
+  const prizes=S.prizes.length?`<ul class="list">${S.prizes.map(p=>`<li><span class="nm">${p.stage==="linea"?"Línea":"Bingo"} · ${esc(p.name)}</span><span class="chip">Cartón ${pad(p.card)}</span></li>`).join("")}</ul>`:`<p class="note">Todavía no hay ganadores.</p>`;
+  const mine=myIds();
+  let mineBox="";
+  if(mine.length&&!(isHost&&!asPlayer)){
+    const evs=mine.map(id=>({id,ev:evalCard(makeCard(S.seed,id),cs)}));
+    const best=evs.slice().sort((a,b)=>a.ev.missing-b.ev.missing)[0];
+    mineBox=`<div class="panel"><h3>Tus cartones</h3><p style="margin:0 0 10px">${mine.length} ${mine.length===1?"cartón":"cartones"}. El más cerca de bingo es el ${pad(best.id)}, le faltan ${best.ev.missing}.</p><button class="btn teal" data-act="tab" data-tab="mios">Ver mis cartones</button></div>`;
+  }
+  let hostBox="";
+  if(isHost&&!asPlayer){
+    const all=[...assignedIds()].map(id=>({id,ev:evalCard(makeCard(S.seed,id),cs)}));
+    const wins=S.called.length?all.filter(x=>S.stage==="linea"?x.ev.line:x.ev.bingo):[];
+    const near=all.filter(x=>!(S.stage==="linea"?x.ev.line:x.ev.bingo)).sort((a,b)=>(S.stage==="linea"?a.ev.lineLeft-b.ev.lineLeft:a.ev.missing-b.ev.missing)).slice(0,4);
+    hostBox=`<div class="panel"><h3>Revisión automática</h3>`+
+      (wins.length?`<ul class="list">${wins.map(x=>`<li><span class="nm">Cartón ${pad(x.id)} · ${esc(ownerOf(x.id))}</span>${S.finished?"":`<button class="btn small primary" data-act="declare" data-id="${x.id}">Dar ${S.stage==="linea"?"línea":"bingo"}</button>`}</li>`).join("")}</ul>`:`<p class="note" style="margin:0 0 8px">Ningún cartón repartido tiene ${S.stage==="linea"?"línea":"bingo"} todavía.</p>`)+
+      (near.length&&!S.finished?`<div class="sep"></div><p class="eyebrow" style="margin:0 0 6px">Cerca de ${S.stage==="linea"?"línea":"bingo"}</p><ul class="list">${near.map(x=>`<li><span class="nm">Cartón ${pad(x.id)} · ${esc(ownerOf(x.id))}</span><span class="chip">faltan ${S.stage==="linea"?x.ev.lineLeft:x.ev.missing}</span></li>`).join("")}</ul>`:"")+`</div>`;
+  }
+  const voiceBtn=`<button class="btn small" data-act="voice">${voiceOn?"Voz activada":"Activar voz"}</button>`;
+  const board=Array.from({length:90},(_,i)=>{const n=i+1;return `<span class="${cs.has(n)?"on":""}${n===last?" last":""}" style="--h:${hue(n)}">${n}</span>`}).join("");
+  const banner=S.finished?`<div class="banner" style="margin-bottom:18px"><span>Partida terminada. Ganador del bingo: ${esc((S.prizes[S.prizes.length-1]||{}).name||"")}</span></div>`:"";
+  return `<div class="hero"><div><div class="eyebrow">${esc(stageLabel())}</div><h1>${esc(S.title)}</h1></div>${voiceBtn}</div>${banner}
+  <div class="layout"><div class="col">
+    <section class="panel"><div class="live">${ballHTML(last,"big"+(pending==="new"?" pop":""))}
+      <div><span class="pill${live?" on":""}">${live?"En directo":S.called.length?"Finalizada":"Listo para empezar"}</span>
+      <div class="word" style="margin-top:8px">${last?words(last):"Esperando el primer número"}</div>
+      <p class="muted" style="margin:2px 0 0">${S.called.length} cantados · quedan ${left}</p></div></div>${ctrl}
+      ${recent.length?`<div class="sep"></div><p class="eyebrow" style="margin:0 0 8px">Anteriores</p><div class="hist">${recent.map(n=>ballHTML(n)).join("")}</div>`:""}
+    </section>
+    <section class="panel"><div class="eyebrow">Tablero</div><h2>Seguimiento de la partida</h2><div class="board">${board}</div>
+      <div class="legend"><span>Coloreado: cantado</span><span>Contorno: último número</span><span>Gris: pendiente</span></div></section>
+  </div><div class="col">
+    <section class="panel"><div class="stat"><div><b>${S.players.length}</b><small>Jugadores</small></div><div><b>${assignedIds().size}/${S.count}</b><small>Cartones repartidos</small></div></div></section>
+    <section class="panel"><h3>Ganadores</h3>${prizes}</section>
+    ${hostBox}${mineBox}
+  </div></div>`;
+}
+
+function jugadoresHTML(){
+  if(!S)return setupHTML();
+  const used=assignedIds(),free=S.count-used.size;
+  return `<div class="hero"><div><div class="eyebrow">Reparto</div><h1>Jugadores y cartones</h1></div>
+    <div class="ctrl" style="margin:0"><button class="btn" data-act="csv">Exportar reparto (CSV)</button><button class="btn" data-act="pdf-free"${free?"":" disabled"}>PDF sin repartir (${free})</button></div></div>
+  <div class="layout"><div class="col"><section class="panel"><h2>Repartir cartones</h2>
+    <form class="form" id="f-players">
+      <label class="f">Nombres (uno por línea)<textarea id="p-names" placeholder="Ana Pérez&#10;Luis Gómez&#10;Familia Rojas"></textarea></label>
+      <label class="f">Cartones por persona<select id="p-per">${[1,2,3,4,5,6].map(n=>`<option value="${n}"${n===(pending&&pending.per||2)?" selected":""}>${n}</option>`).join("")}</select></label>
+      <p class="note">Si se acaban los cartones, se crean más automáticamente. Cada jugador abre esta página, escribe su nombre en “Mis cartones” y los ve con los números marcados.</p>
+      <div><button class="btn primary" type="submit">Repartir</button></div></form></section></div>
+  <div class="col"><section class="panel"><div class="stat"><div><b>${S.players.length}</b><small>Jugadores</small></div><div><b>${used.size}/${S.count}</b><small>Repartidos</small></div></div>
+    <div class="sep"></div>
+    ${S.players.length?`<ul class="list">${S.players.map(p=>`<li><div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="chips" style="margin-top:4px">${p.cards.map(c=>`<span class="chip">${pad(c)}</span>`).join("")}</div></div>
+      <div class="ctrl" style="margin:0"><button class="btn small" data-act="plus" data-id="${p.id}">+1</button><button class="btn small" data-act="pdf-player" data-id="${p.id}">PDF</button><button class="btn small danger" data-act="del-player" data-id="${p.id}">${confirmKey==="del"+p.id?"Confirmar":"Quitar"}</button></div></li>`).join("")}</ul>`:`<p class="note">Aún no hay jugadores. Escribe los nombres a la izquierda y reparte.</p>`}
+  </section></div></div>`;
+}
+
+function cartonesHTML(){
+  if(!S)return setupHTML();
+  if(isHost&&!asPlayer){
+    const q=parseInt(cardQuery,10);let one="";
+    if(cardQuery&&q>=1&&q<=S.count)one=`<div class="panel"><h3>Cartón ${pad(q)}</h3>${cardHTML(q)}</div>`;
+    else if(cardQuery)one=`<p class="note">No existe el cartón ${esc(cardQuery)}. Hay del 1 al ${S.count}.</p>`;
+    const ids=Array.from({length:Math.min(shown,S.count)},(_,i)=>i+1);
+    return `<div class="hero"><div><div class="eyebrow">Revisión</div><h1>Cartones</h1></div><button class="btn primary" data-act="pdf-all">PDF de todos (${S.count})</button></div>
+    <div class="panel" style="margin-bottom:18px"><label class="f">Verificar un cartón por número<input type="number" id="card-q" min="1" max="${S.count}" value="${esc(cardQuery)}" placeholder="Ej. 7"></label></div>
+    ${one?`<div style="margin-bottom:18px">${one}</div>`:""}
+    <div class="cartones">${ids.map(cardHTML).join("")}</div>
+    ${shown<S.count?`<div class="ctrl" style="justify-content:center"><button class="btn" data-act="more">Mostrar más</button></div>`:""}`;
+  }
+  return miosHTML();
+}
+function miosHTML(){
+  if(!S)return setupHTML();
+  const m=lsGet("bingo.mine",{name:"",nums:""}),ids=myIds();
+  return `<div class="hero"><div><div class="eyebrow">Jugador</div><h1>Mis cartones</h1></div>${ids.length?`<button class="btn primary" data-act="pdf-mine">Descargar PDF</button>`:""}</div>
+  <div class="panel" style="margin-bottom:18px"><form class="form" id="f-mine"><div class="row2">
+    <label class="f">Tu nombre (como te anotó el anfitrión)<input type="text" id="m-name" value="${esc(m.name)}" placeholder="Ana Pérez"></label>
+    <label class="f">O tus números de cartón<input type="text" id="m-nums" value="${esc(m.nums)}" placeholder="3, 7, 12"></label></div>
+    <div><button class="btn teal" type="submit">Buscar mis cartones</button></div></form></div>
+  ${ids.length?`<div class="cartones">${ids.map(cardHTML).join("")}</div>`:`<div class="panel empty-state"><h2>Aún no tienes cartones aquí</h2><p class="muted">Escribe el nombre que le diste al anfitrión o los números de tus cartones.</p></div>`}`;
+}
+
+function ajustesHTML(){
+  if(!S)return setupHTML();
+  const c=k=>confirmKey===k;
+  return `<div class="hero"><div><div class="eyebrow">Anfitrión</div><h1>Ajustes de la sala</h1></div></div>
+  <div class="layout"><div class="col"><section class="panel"><h2>Partida</h2><form class="form" id="f-set">
+    <label class="f">Nombre<input type="text" id="s-title" value="${esc(S.title)}" maxlength="48"></label>
+    <label class="f">Cartones disponibles<input type="number" id="s-count" value="${S.count}" min="${assignedIds().size||1}" max="300"></label>
+    <div><button class="btn primary" type="submit">Guardar</button></div></form></section></div>
+  <div class="col"><section class="panel"><h2>Reiniciar</h2><div class="form">
+    <div><button class="btn danger" data-act="reset-nums">${c("rn")?"Confirmar: borrar números cantados":"Reiniciar números"}</button><p class="note">Borra los números cantados y los premios. Los cartones y el reparto se mantienen.</p></div>
+    <div><button class="btn danger" data-act="reset-cards">${c("rc")?"Confirmar: cartones nuevos":"Nueva partida con cartones nuevos"}</button><p class="note">Cambia todos los números de los cartones. Si ya imprimiste, tendrás que volver a imprimir.</p></div>
+    <div><button class="btn" data-act="player-view">Ver como jugador</button></div></div></section></div></div>`;
+}
+
+/* ---------- render ---------- */
+function tabsFor(){
+  if(!S&&!isHost)return [["sala","Sala"]];
+  if(isHost&&!asPlayer)return [["sala","Sala"],["jugadores","Jugadores"],["cartones","Cartones"],["ajustes","Ajustes"]];
+  return [["sala","Sala"],["mios","Mis cartones"]];
+}
+function render(keepFocus){
+  const panel=$("#panel");
+  const vals={};panel.querySelectorAll("input,textarea,select").forEach(e=>{if(e.id)vals[e.id]=e.value});
+  const ae=document.activeElement,aeId=ae&&ae.id,selS=ae&&ae.selectionStart,selE=ae&&ae.selectionEnd;
+  const tabs=tabsFor();if(!tabs.some(t=>t[0]===tab))tab=tabs[0][0];
+  $("#tabs").innerHTML=tabs.map(t=>`<button role="tab" data-act="tab" data-tab="${t[0]}" aria-selected="${t[0]===tab}">${t[1]}</button>`).join("");
+  let who="";
+  if(!ready)who="Conectando…";
+  else if(isHost)who=(asPlayer?`<span>Vista de jugador</span><button data-act="host-view">Volver al panel</button>`:`<span>Anfitrión</span>`)+(REMOTE?`<button data-act="logout">Salir</button>`:"");
+  else who=showLogin?`<form id="f-login" style="display:flex;gap:6px;align-items:center"><input type="password" id="hk" placeholder="Clave del anfitrión" autocomplete="current-password" style="width:150px;padding:5px 10px"><button class="btn small primary" type="submit">Entrar</button></form>`:`<span>Jugador</span><button data-act="login">Soy el anfitrión</button>`;
+  if(who!==lastWho){$("#who").innerHTML=who;lastWho=who;const hk=document.getElementById("hk");if(hk)hk.focus()}
+  let html="";
+  if(!ready)html=`<div class="panel empty-state"><div class="ball big empty"><span>…</span></div><p class="muted">Abriendo la sala</p></div>`;
+  else if(tab==="sala")html=salaHTML();
+  else if(tab==="jugadores")html=jugadoresHTML();
+  else if(tab==="cartones")html=cartonesHTML();
+  else if(tab==="mios")html=miosHTML();
+  else if(tab==="ajustes")html=ajustesHTML();
+  panel.innerHTML=html;
+  for(const id in vals){const e=document.getElementById(id);if(e&&id!=="auto-secs")e.value=vals[id]}
+  if(aeId){const e=document.getElementById(aeId);if(e){e.focus();try{if(selS!=null&&e.type!=="number")e.setSelectionRange(selS,selE)}catch(_){}}}
+  pending=null;
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener("click",ev=>{
+  const b=ev.target.closest("[data-act]");if(!b)return;
+  const act=b.dataset.act,id=b.dataset.id;
+  if(act==="tab"){tab=b.dataset.tab;lsSet("bingo.tab",tab);confirmKey=null;render();window.scrollTo(0,0);return}
+  if(act==="login"){showLogin=true;render();return}
+  if(act==="logout"){isHost=false;asPlayer=false;HOSTKEY="";lsSet("bingo.hostkey","");stopAuto();tab="sala";render();return}
+  if(!S&&act!=="host-view"&&act!=="voice")return;
+  if(act==="draw"){pending="new";draw()}
+  else if(act==="auto"){if(autoTimer){stopAuto();render()}else{pending="new";startAuto()}}
+  else if(act==="undo"){S.called.pop();S.finished=false;commit()}
+  else if(act==="declare")declare(parseInt(id,10));
+  else if(act==="voice"){voiceOn=!voiceOn;lsSet("bingo.voice",voiceOn);render();if(voiceOn)say(S&&S.called.length?S.called[S.called.length-1]:7)}
+  else if(act==="more"){shown+=12;render()}
+  else if(act==="plus"){const p=S.players.find(p=>p.id===id);if(p){p.cards.push(allocate(1)[0]);commit()}}
+  else if(act==="del-player"){if(confirmKey==="del"+id){S.players=S.players.filter(p=>p.id!==id);confirmKey=null;commit()}else{confirmKey="del"+id;render()}}
+  else if(act==="pdf-all")pdfFor(Array.from({length:S.count},(_,i)=>i+1),"cartones-bingo");
+  else if(act==="pdf-free"){const u=assignedIds();pdfFor(Array.from({length:S.count},(_,i)=>i+1).filter(n=>!u.has(n)),"cartones-sin-repartir")}
+  else if(act==="pdf-player"){const p=S.players.find(p=>p.id===id);if(p)pdfFor(p.cards.slice().sort((a,b)=>a-b),"cartones-"+norm(p.name).replace(/\s+/g,"-"))}
+  else if(act==="pdf-mine")pdfFor(myIds(),"mis-cartones-bingo");
+  else if(act==="csv")csvReparto();
+  else if(act==="reset-nums"){if(confirmKey==="rn"){confirmKey=null;resetNumbers()}else{confirmKey="rn";render()}}
+  else if(act==="reset-cards"){if(confirmKey==="rc"){confirmKey=null;newCards()}else{confirmKey="rc";render()}}
+  else if(act==="player-view"){asPlayer=true;tab="sala";render()}
+  else if(act==="host-view"){asPlayer=false;tab="sala";render()}
+});
+document.addEventListener("submit",ev=>{
+  ev.preventDefault();const f=ev.target.id;
+  if(f==="f-login"){
+    const k=$("#hk").value;
+    fetch("/api/game?check=1",{method:"POST",headers:{"x-host-key":k}}).then(r=>{
+      if(r.ok){HOSTKEY=k;lsSet("bingo.hostkey",k);isHost=true;showLogin=false;if(voiceOn===null)voiceOn=true;render();toast("Bienvenido, anfitrión")}
+      else toast("Clave incorrecta")}).catch(()=>toast("No se pudo verificar la clave"));
+    return;
+  }
+  if(f==="f-create"){
+    const title=$("#c-title").value.trim(),count=Math.max(1,Math.min(300,parseInt($("#c-count").value,10)||30));
+    S=newState(title,count);seenCalled=0;seenPrizes=0;commit();toast("Sala creada");
+  }else if(f==="f-players"){
+    const n=addPlayers($("#p-names").value,parseInt($("#p-per").value,10)||1);
+    if(!n){toast("Escribe al menos un nombre");return}
+    $("#p-names").value="";commit();toast(n+(n===1?" jugador agregado":" jugadores agregados"));
+  }else if(f==="f-mine"){
+    lsSet("bingo.mine",{name:$("#m-name").value,nums:$("#m-nums").value});render();
+  }else if(f==="f-set"){
+    S.title=$("#s-title").value.trim()||S.title;
+    S.count=Math.max(assignedIds().size||1,Math.min(300,parseInt($("#s-count").value,10)||S.count));
+    commit();toast("Cambios guardados");
+  }
+});
+document.addEventListener("input",ev=>{
+  if(ev.target.id==="card-q"){cardQuery=ev.target.value;render()}
+});
+document.addEventListener("change",ev=>{
+  if(ev.target.id==="auto-secs"){autoSecs=parseInt(ev.target.value,10)||8;lsSet("bingo.autosecs",autoSecs);if(autoTimer)startAuto()}
+});
+
+/* ---------- arranque ---------- */
+function onState(next){
+  const prev=S;S=next;
+  if(S&&seenCalled>=0&&S.called.length>seenCalled&&!(isHost&&!asPlayer)){pending="new";say(S.called[S.called.length-1])}
+  if(S&&seenPrizes>=0&&S.prizes.length>seenPrizes&&!(isHost&&!asPlayer)){const p=S.prizes[S.prizes.length-1];toast((p.stage==="linea"?"¡Línea! ":"¡Bingo! ")+p.name+" (cartón "+pad(p.card)+")")}
+  seenCalled=S?S.called.length:0;seenPrizes=S?S.prizes.length:0;
+  ready=true;render();
+}
+async function poll(){
+  if(!REMOTE||writing>0||document.hidden)return;
+  try{
+    const r=await fetch("/api/game",{cache:"no-store"});if(!r.ok)return;
+    const d=await r.json(),next=d.state||null;
+    if((next?next.t:0)!==(S?S.t:0))onState(next);
+  }catch(e){}
+}
+async function boot(){
+  render();
+  DL={save:async function(o){
+    const blob=o.data instanceof Blob?o.data:new Blob([o.data],{type:"text/csv;charset=utf-8"});
+    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=o.filename;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    return {status:"saved"};
+  }};
+  if(voiceOn===null)voiceOn=false;
+  HOSTKEY=lsGet("bingo.hostkey","");
+  let remote=null;
+  try{
+    const r=await fetch("/api/game",{cache:"no-store"});
+    if(r.ok)remote=await r.json();
+  }catch(e){}
+  if(remote){
+    REMOTE=true;
+    if(HOSTKEY){
+      try{const r=await fetch("/api/game?check=1",{method:"POST",headers:{"x-host-key":HOSTKEY}});isHost=r.ok;if(!r.ok){HOSTKEY="";lsSet("bingo.hostkey","")}}catch(e){isHost=false}
+    }
+    onState(remote.state||null);
+    setInterval(poll,3000);
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)poll()});
+  }else{
+    isHost=true;                       // sin servidor configurado: partida local en este navegador
+    onState(lsGet(LOCAL_KEY,null));
+    toast("Modo local: configura la base de datos para jugar en línea");
+  }
+}
+boot();
+})();
+</script>
+</body></html>
