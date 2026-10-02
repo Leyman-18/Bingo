@@ -4,8 +4,20 @@
 // POST /api/game?check=1    -> verifica la clave del anfitrión
 const crypto = require("crypto");
 
-const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+// Busca las variables de Upstash con o sin prefijo (por ejemplo STORAGE_KV_REST_API_URL).
+function findEnv(suffixes) {
+  for (const suf of suffixes) {
+    if (process.env[suf]) return process.env[suf];
+  }
+  for (const name of Object.keys(process.env)) {
+    for (const suf of suffixes) {
+      if (name.endsWith("_" + suf) && process.env[name]) return process.env[name];
+    }
+  }
+  return undefined;
+}
+const URL_ = findEnv(["KV_REST_API_URL", "UPSTASH_REDIS_REST_URL"]);
+const TOKEN = findEnv(["KV_REST_API_TOKEN", "UPSTASH_REDIS_REST_TOKEN"]);
 const HOST_KEY = process.env.BINGO_HOST_KEY;
 const KEY = "bingo:game";
 
@@ -35,7 +47,8 @@ function validState(s) {
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   if (!URL_ || !TOKEN || !HOST_KEY) {
-    return res.status(503).json({ error: "Falta configurar la base de datos o BINGO_HOST_KEY" });
+    const falta = [!URL_ && "URL de la base", !TOKEN && "token de la base", !HOST_KEY && "BINGO_HOST_KEY"].filter(Boolean).join(", ");
+    return res.status(503).json({ error: "Falta configurar: " + falta });
   }
   try {
     if (req.method === "GET") {
