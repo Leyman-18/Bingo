@@ -120,6 +120,22 @@ textarea{min-height:110px;resize:vertical}
 @media(prefers-reduced-motion:reduce){.ball.pop{animation:none}}
 .sep{height:1px;background:var(--line);margin-block:14px}
 body{margin:0}[hidden]{display:none!important}
+
+.pats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.patbtn{display:grid;gap:6px;align-content:start;text-align:left;background:var(--surface);border:2px solid var(--line);border-radius:12px;padding:10px;cursor:pointer;min-width:0}
+.patbtn:hover{border-color:var(--ink)}
+.patbtn.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+.patbtn b{font-family:var(--f-display);font-weight:800;font-size:15px;line-height:1.15}
+.patbtn small{color:var(--muted);font-size:12px;line-height:1.35}
+.patbtn:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.pv{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:2px;width:100%}
+.pv i{aspect-ratio:1.15;background:var(--line);border-radius:2px;display:block}
+.pv i.on{background:var(--accent)}
+.pv.any i.on{background:var(--gold)}
+.cell.inpat{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.carton.is-win{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent)}
+.chk{display:flex;gap:8px;align-items:center;font-weight:500;color:var(--ink);margin-top:12px}
+.chk input{width:auto}
 </style></head><body>
 
 <header class="top"><div class="wrap">
@@ -153,13 +169,14 @@ function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show"
 function rng(seed){let s=seed|0;return function(){s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 const SUBS={1:[[0],[1],[2]],2:[[0,1],[0,2],[1,2]],3:[[0,1,2]]};
 const cache=new Map();
+/* Los laterales (primera y última columna) siempre llevan 3 números, para que "lateral" valga lo mismo en todos los cartones. */
 function makeCard(seed,id){
   const key=seed+":"+id; if(cache.has(key))return cache.get(key);
   const r=rng((seed^Math.imul(id,0x9E3779B1))>>>0); r();r();
   let layout=null;
   for(let tries=0;tries<4000&&!layout;tries++){
-    const counts=Array(9).fill(1);let extra=6;
-    while(extra>0){const c=Math.floor(r()*9);if(counts[c]<3){counts[c]++;extra--}}
+    const counts=Array(9).fill(1);counts[0]=3;counts[8]=3;let extra=2;
+    while(extra>0){const c=1+Math.floor(r()*7);if(counts[c]<3){counts[c]++;extra--}}
     const used=[0,0,0],pick=[];let ok=true;
     for(let c=0;c<9&&ok;c++){
       const opts=SUBS[counts[c]].filter(s=>s.every(x=>used[x]<5));
@@ -176,10 +193,51 @@ function makeCard(seed,id){
   });
   cache.set(key,rows);return rows;
 }
-function evalCard(rows,called){
-  let total=0,best=0,line=false;
-  rows.forEach(row=>{let h=0;row.forEach(n=>{if(n&&called.has(n))h++});total+=h;best=Math.max(best,h);if(h===5)line=true});
-  return {line,bingo:total===15,missing:15-total,lineLeft:5-best,rowDone:rows.map(row=>row.every(n=>!n||called.has(n)))};
+
+/* ---------- patrones de juego ---------- */
+const PATTERNS=[
+  {id:"linea",name:"Cualquier línea",desc:"Una fila completa, la que sea.",alts:[["r0"],["r1"],["r2"]]},
+  {id:"medio",name:"Línea del medio",desc:"Solo la fila central.",alts:[["r1"]]},
+  {id:"arriba_lat",name:"Arriba y lateral",desc:"Fila de arriba y el lateral izquierdo, en forma de L.",alts:[["r0","cL"]]},
+  {id:"arriba_abajo",name:"Arriba y abajo",desc:"La fila de arriba y la de abajo.",alts:[["r0","r2"]]},
+  {id:"laterales",name:"Los dos laterales",desc:"La primera y la última columna.",alts:[["cL","cR"]]},
+  {id:"lleno",name:"Cartón lleno",desc:"Los 15 números del cartón.",alts:[["r0","r1","r2"]]},
+  {id:"custom",name:"Personalizado",desc:"Tú eliges qué filas y laterales.",alts:null}
+];
+const PIECES=[["r0","Arriba"],["r1","Medio"],["r2","Abajo"],["cL","Lateral izq."],["cR","Lateral der."]];
+const PLABEL={r0:"arriba",r1:"medio",r2:"abajo",cL:"lateral izq.",cR:"lateral der."};
+const patById=id=>PATTERNS.find(p=>p.id===id)||PATTERNS[0];
+function altsOf(pat){
+  const p=patById(pat&&pat.id);
+  if(p.id==="custom")return [(pat.pieces&&pat.pieces.length)?pat.pieces:["r0"]];
+  return p.alts;
+}
+function patName(pat){
+  const p=patById(pat&&pat.id);
+  if(p.id==="custom"){const pcs=pat.pieces||[];return pcs.length?"Personalizado: "+pcs.map(x=>PLABEL[x]).join(" + "):"Personalizado"}
+  return p.name;
+}
+function pieceCells(pc){
+  if(pc[0]==="r")return Array.from({length:9},(_,c)=>[+pc[1],c]);
+  const c=pc==="cL"?0:8;return [[0,c],[1,c],[2,c]];
+}
+function altCells(alt){const k=new Set();alt.forEach(pc=>pieceCells(pc).forEach(x=>k.add(x[0]*9+x[1])));return [...k]}
+function patCount(pat){
+  const a=altsOf(pat)[0],nr=a.filter(x=>x[0]==="r").length,nc=a.length-nr;
+  return 5*nr+3*nc-nr*nc;
+}
+function evalCard(rows,called,pat){
+  let total=0,left=99;
+  rows.forEach(row=>row.forEach(n=>{if(n&&!called.has(n))total++}));
+  altsOf(pat).forEach(a=>{let l=0;altCells(a).forEach(k=>{const n=rows[Math.floor(k/9)][k%9];if(n&&!called.has(n))l++});if(l<left)left=l});
+  return {win:left===0,left:left,missing:total};
+}
+function patSet(pat){const al=altsOf(pat);return al.length===1?new Set(altCells(al[0])):null}
+function previewHTML(pat){
+  const al=altsOf(pat),set=new Set();al.forEach(a=>altCells(a).forEach(k=>set.add(k)));
+  let h='<div class="pv'+(al.length>1?" any":"")+'" aria-hidden="true">';
+  for(let k=0;k<27;k++)h+='<i class="'+(set.has(k)?"on":"")+'"></i>';
+  return h+"</div>";
 }
 
 /* ---------- estado y almacenamiento ---------- */
@@ -191,10 +249,11 @@ let writing=0,queue=Promise.resolve(),seenCalled=-1,seenPrizes=-1;
 let voiceOn=lsGet("bingo.voice",null);
 let autoTimer=null,autoSecs=lsGet("bingo.autosecs",8);
 let confirmKey=null,shown=12,cardQuery="",pending=null;
+let draft={id:"linea",pieces:["r0"]},roundOpen=false,nrNew=false;
 const LOCAL_KEY="bingo.local.v1";
 
-function newState(title,count){
-  return {v:1,title:title||"Bingo de la familia",seed:(rand(2147483647)||1),count:count,called:[],players:[],stage:"linea",prizes:[],finished:false,t:Date.now()};
+function newState(title,count,pat){
+  return {v:2,title:title||"Bingo de la familia",seed:(rand(2147483647)||1),count:count,called:[],players:[],pattern:pat||{id:"linea"},round:1,history:[],prizes:[],finished:false,t:Date.now()};
 }
 function save(){
   S.t=Date.now();
@@ -230,6 +289,7 @@ function draw(){
   if(!left.length){stopAuto();return false}
   const n=left[rand(left.length)];S.called.push(n);commit();say(n);
   if(S.called.length>=90)stopAuto();
+  if(hasWinner()){stopAuto();render();toast("¡Hay un cartón que completó el patrón!")}
   return true;
 }
 function stopAuto(){if(autoTimer){clearInterval(autoTimer);autoTimer=null}}
@@ -247,11 +307,25 @@ function addPlayers(text,per){
 }
 function declare(cardId){
   const name=ownerOf(cardId)||"Sin nombre";
-  S.prizes.push({stage:S.stage,card:cardId,name:name});
-  if(S.stage==="linea")S.stage="bingo";else{S.finished=true;stopAuto()}
-  commit();toast("Premio registrado: "+name);
+  S.prizes.push({card:cardId,name:name});S.finished=true;stopAuto();
+  commit();toast("Ganador registrado: "+name);
 }
-function resetNumbers(){stopAuto();S.called=[];S.prizes=[];S.stage="linea";S.finished=false;seenCalled=0;seenPrizes=0;commit()}
+function hasWinner(){
+  if(!S||!S.called.length)return false;const cs=calledSet();
+  return [...assignedIds()].some(id=>evalCard(makeCard(S.seed,id),cs,S.pattern).win);
+}
+function applyRound(){
+  const pat={id:draft.id};if(draft.id==="custom")pat.pieces=draft.pieces.slice();
+  const fresh=S.called.length===0&&!S.finished;
+  if(!fresh){
+    S.history=S.history||[];
+    S.history.push({round:S.round,pattern:patName(S.pattern),winners:S.prizes.map(p=>p.name+" (cartón "+pad(p.card)+")")});
+    if(nrNew){S.seed=rand(2147483647)||1;cache.clear()}
+    S.round=(S.round||1)+1;S.called=[];S.prizes=[];S.finished=false;seenCalled=0;seenPrizes=0;stopAuto();
+  }
+  S.pattern=pat;roundOpen=false;nrNew=false;commit();
+}
+function resetNumbers(){stopAuto();S.called=[];S.prizes=[];S.finished=false;seenCalled=0;seenPrizes=0;commit()}
 function newCards(){stopAuto();S.seed=rand(2147483647)||1;cache.clear();resetNumbers()}
 
 /* ---------- PDF ---------- */
@@ -281,7 +355,7 @@ async function pdfFor(ids,name){
     }));
     doc.setLineWidth(.7);doc.rect(M,gy,9*cw,3*chh);
     doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(86,98,133);
-    doc.text("15 números · Línea = una fila completa · Bingo = el cartón completo",M,gy+3*chh+4.5);
+    doc.text("15 números · Gana quien complete el patrón que anuncie el anfitrión",M,gy+3*chh+4.5);
     if(i%per<per-1&&i<ids.length-1){doc.setDrawColor(150,160,185);doc.setLineWidth(.2);doc.setLineDashPattern([1.5,1.5],0);doc.line(M,y0+pitch-4,W-M,y0+pitch-4);doc.setLineDashPattern([],0)}
   });
   try{await DL.save({filename:name+".pdf",data:doc.output("blob")});toast("PDF listo")}
@@ -296,22 +370,44 @@ async function csvReparto(){
 
 /* ---------- vistas ---------- */
 function ballHTML(n,cls){return n?`<div class="ball ${cls||""}" style="--h:${hue(n)}"><span>${n}</span></div>`:`<div class="ball ${cls||""} empty"><span>–</span></div>`}
-function stageLabel(){return S.finished?"Partida terminada":(S.stage==="linea"?"Premio en juego: línea":"Premio en juego: bingo")}
+function chooserHTML(){
+  const cur=draft.id==="custom"?{id:"custom",pieces:draft.pieces}:{id:draft.id};
+  let h='<div class="pats">'+PATTERNS.map(p=>{
+    const pat=p.id==="custom"?{id:"custom",pieces:draft.pieces}:{id:p.id};
+    return `<button type="button" class="patbtn${draft.id===p.id?" sel":""}" data-act="pick-pat" data-id="${p.id}" aria-pressed="${draft.id===p.id}">${previewHTML(pat)}<b>${p.name}</b><small>${p.desc}</small></button>`;
+  }).join("")+"</div>";
+  if(draft.id==="custom"){
+    h+=`<div class="flat" style="margin-top:12px"><p class="eyebrow" style="margin:0 0 8px">Elige qué se debe completar</p><div class="ctrl" style="margin:0">${PIECES.map(pc=>`<button type="button" class="btn small${draft.pieces.indexOf(pc[0])>-1?" teal":""}" data-act="pick-piece" data-p="${pc[0]}" aria-pressed="${draft.pieces.indexOf(pc[0])>-1}">${pc[1]}</button>`).join("")}</div></div>`;
+  }
+  h+=`<p class="note" style="margin:12px 0 0">${draft.id==="custom"&&!draft.pieces.length?"Elige al menos una parte del cartón.":draft.id==="linea"?"Gana quien complete una fila (5 números).":"Gana quien complete los "+patCount(cur)+" números resaltados."}</p>`;
+  return h;
+}
+function roundPanelHTML(){
+  const fresh=S.called.length===0&&!S.finished;
+  const bad=draft.id==="custom"&&!draft.pieces.length;
+  return `<section class="panel" style="margin-bottom:18px"><div class="eyebrow">${fresh?"Antes de empezar":"Siguiente partida"}</div><h2>${fresh?"Elige el patrón":"Partida "+((S.round||1)+1)}</h2>${chooserHTML()}
+    ${fresh?"":`<label class="chk"><input type="checkbox" id="nr-new"${nrNew?" checked":""}> Usar cartones nuevos (hay que volver a imprimir)</label>`}
+    <div class="ctrl"><button class="btn primary" data-act="apply-round"${bad?" disabled":""}>${fresh?"Guardar patrón":"Empezar partida "+((S.round||1)+1)}</button><button class="btn" data-act="close-round">Cancelar</button></div></section>`;
+}
+function patternPanel(){
+  const id=patById(S.pattern&&S.pattern.id).id;
+  return `<section class="panel"><div class="eyebrow">Patrón de esta partida</div><h2 style="margin-bottom:10px">${esc(patName(S.pattern))}</h2><div style="max-width:220px;margin-bottom:10px">${previewHTML(S.pattern)}</div><p class="note" style="margin:0">${id==="linea"?"Gana quien complete una fila (5 números).":"Gana quien complete los "+patCount(S.pattern)+" números resaltados."}</p></section>`;
+}
 
 function cardHTML(id){
-  const rows=makeCard(S.seed,id),cs=calledSet(),ev=evalCard(rows,cs),last=S.called[S.called.length-1];
-  const body=rows.map((row,ri)=>`<div class="crow${ev.rowDone[ri]?" done":""}">`+row.map(n=>n?`<span class="cell${cs.has(n)?" on":""}${n===last?" last":""}">${n}</span>`:`<span class="cell empty"></span>`).join("")+`</div>`).join("");
-  const st=ev.bingo?"¡BINGO!":ev.line?"¡Línea!":"Sigue jugando";
-  return `<article class="carton${ev.bingo?" is-bingo":ev.line?" is-line":""}"><header><span class="cn">Cartón ${pad(id)}</span><span class="ow">${esc(ownerOf(id)||"Sin repartir")}</span></header><div class="cgrid">${body}</div><footer><span class="st">${st}</span><span>Línea: ${ev.line?"completa":"faltan "+ev.lineLeft} · Bingo: faltan ${ev.missing}</span></footer></article>`;
+  const rows=makeCard(S.seed,id),cs=calledSet(),ev=evalCard(rows,cs,S.pattern),last=S.called[S.called.length-1],ps=patSet(S.pattern);
+  const body=rows.map((row,ri)=>`<div class="crow">`+row.map((n,ci)=>n?`<span class="cell${cs.has(n)?" on":""}${ps&&ps.has(ri*9+ci)?" inpat":""}${n===last?" last":""}">${n}</span>`:`<span class="cell empty"></span>`).join("")+`</div>`).join("");
+  return `<article class="carton${ev.win?" is-win":""}"><header><span class="cn">Cartón ${pad(id)}</span><span class="ow">${esc(ownerOf(id)||"Sin repartir")}</span></header><div class="cgrid">${body}</div><footer><span class="st">${ev.win?"¡Completaste el patrón!":"Sigue jugando"}</span><span>${ev.win?"Avisa al anfitrión":"Para ganar: faltan "+ev.left}</span></footer></article>`;
 }
 
 function setupHTML(){
   if(!isHost)return `<div class="panel empty-state"><div class="ball big empty"><span>?</span></div><h2>La sala aún no abre</h2><p class="muted">El anfitrión todavía no ha creado la partida. Esta página se actualiza sola cuando empiece.</p></div>`;
   return `<div class="hero"><div><div class="eyebrow">Nueva sala</div><h1>Crea tu partida de bingo</h1></div></div>
-  <div class="panel" style="max-width:560px"><form class="form" id="f-create">
+  <div class="panel" style="max-width:820px"><form class="form" id="f-create">
     <label class="f">Nombre de la partida<input type="text" id="c-title" value="Bingo de la familia" maxlength="48"></label>
     <label class="f">Cartones disponibles<input type="number" id="c-count" value="30" min="1" max="300"></label>
-    <p class="note">Cada cartón tiene 15 números (3 filas, 9 columnas) del 1 al 90. Después podrás repartirlos por nombre y sacar el PDF para imprimir.</p>
+    <div><p class="eyebrow" style="margin:0 0 8px">Patrón de la primera partida</p>${chooserHTML()}</div>
+    <p class="note">Cada cartón tiene 15 números (3 filas, 9 columnas) del 1 al 90. Podrás cambiar el patrón antes de cada partida, repartir los cartones por nombre y sacar el PDF para imprimir.</p>
     <div><button class="btn primary" type="submit">Crear sala</button></div></form></div>`;
 }
 
@@ -321,38 +417,43 @@ function salaHTML(){
   const recent=S.called.slice(-7,-1).reverse();
   const left=90-S.called.length;
   const live=S.called.length>0&&!S.finished;
+  const hostMode=isHost&&!asPlayer;
+  const fresh=S.called.length===0&&!S.finished;
   let ctrl="";
-  if(isHost&&!asPlayer){
+  if(hostMode){
     ctrl=`<div class="ctrl">
       <button class="btn primary" data-act="draw"${S.finished||left===0?" disabled":""}>Cantar número</button>
       <button class="btn${autoTimer?" teal":""}" data-act="auto"${S.finished||left===0?" disabled":""}>${autoTimer?"Pausar automático":"Modo automático"}</button>
       <label class="f" style="display:flex;align-items:center;gap:6px;font-weight:500"><span>cada</span><select id="auto-secs" style="width:auto">${[5,8,10,15,20].map(s=>`<option value="${s}"${s===autoSecs?" selected":""}>${s} s</option>`).join("")}</select></label>
-      <button class="btn" data-act="undo"${S.called.length?"":" disabled"}>Deshacer último</button></div>`;
+      <button class="btn" data-act="undo"${S.called.length?"":" disabled"}>Deshacer último</button>
+      <button class="btn" data-act="open-round">${fresh?"Cambiar patrón":"Nueva partida"}</button></div>`;
   }
-  const prizes=S.prizes.length?`<ul class="list">${S.prizes.map(p=>`<li><span class="nm">${p.stage==="linea"?"Línea":"Bingo"} · ${esc(p.name)}</span><span class="chip">Cartón ${pad(p.card)}</span></li>`).join("")}</ul>`:`<p class="note">Todavía no hay ganadores.</p>`;
+  const prizes=S.prizes.length?`<ul class="list">${S.prizes.map(p=>`<li><span class="nm">${esc(p.name)}</span><span class="chip">Cartón ${pad(p.card)}</span></li>`).join("")}</ul>`:`<p class="note" style="margin:0">Todavía no hay ganador en esta partida.</p>`;
+  const hist=(S.history&&S.history.length)?`<div class="sep"></div><p class="eyebrow" style="margin:0 0 6px">Partidas anteriores</p><ul class="list">${S.history.slice().reverse().map(h=>`<li><span class="nm">Partida ${h.round} · ${esc(h.pattern)}</span><span class="note">${h.winners.length?esc(h.winners.join(", ")):"Sin ganador"}</span></li>`).join("")}</ul>`:"";
   const mine=myIds();
   let mineBox="";
-  if(mine.length&&!(isHost&&!asPlayer)){
-    const evs=mine.map(id=>({id,ev:evalCard(makeCard(S.seed,id),cs)}));
-    const best=evs.slice().sort((a,b)=>a.ev.missing-b.ev.missing)[0];
-    mineBox=`<div class="panel"><h3>Tus cartones</h3><p style="margin:0 0 10px">${mine.length} ${mine.length===1?"cartón":"cartones"}. El más cerca de bingo es el ${pad(best.id)}, le faltan ${best.ev.missing}.</p><button class="btn teal" data-act="tab" data-tab="mios">Ver mis cartones</button></div>`;
+  if(mine.length&&!hostMode){
+    const evs=mine.map(id=>({id,ev:evalCard(makeCard(S.seed,id),cs,S.pattern)}));
+    const best=evs.slice().sort((a,b)=>a.ev.left-b.ev.left)[0];
+    mineBox=`<div class="panel"><h3>Tus cartones</h3><p style="margin:0 0 10px">${mine.length} ${mine.length===1?"cartón":"cartones"}. ${best.ev.win?"El "+pad(best.id)+" completó el patrón.":"El más cerca es el "+pad(best.id)+", le faltan "+best.ev.left+"."}</p><button class="btn teal" data-act="tab" data-tab="mios">Ver mis cartones</button></div>`;
   }
   let hostBox="";
-  if(isHost&&!asPlayer){
-    const all=[...assignedIds()].map(id=>({id,ev:evalCard(makeCard(S.seed,id),cs)}));
-    const wins=S.called.length?all.filter(x=>S.stage==="linea"?x.ev.line:x.ev.bingo):[];
-    const near=all.filter(x=>!(S.stage==="linea"?x.ev.line:x.ev.bingo)).sort((a,b)=>(S.stage==="linea"?a.ev.lineLeft-b.ev.lineLeft:a.ev.missing-b.ev.missing)).slice(0,4);
+  if(hostMode){
+    const all=[...assignedIds()].map(id=>({id,ev:evalCard(makeCard(S.seed,id),cs,S.pattern)}));
+    const wins=S.called.length?all.filter(x=>x.ev.win):[];
+    const near=all.filter(x=>!x.ev.win).sort((a,b)=>a.ev.left-b.ev.left).slice(0,4);
+    const declared=new Set(S.prizes.map(p=>p.card));
     hostBox=`<div class="panel"><h3>Revisión automática</h3>`+
-      (wins.length?`<ul class="list">${wins.map(x=>`<li><span class="nm">Cartón ${pad(x.id)} · ${esc(ownerOf(x.id))}</span>${S.finished?"":`<button class="btn small primary" data-act="declare" data-id="${x.id}">Dar ${S.stage==="linea"?"línea":"bingo"}</button>`}</li>`).join("")}</ul>`:`<p class="note" style="margin:0 0 8px">Ningún cartón repartido tiene ${S.stage==="linea"?"línea":"bingo"} todavía.</p>`)+
-      (near.length&&!S.finished?`<div class="sep"></div><p class="eyebrow" style="margin:0 0 6px">Cerca de ${S.stage==="linea"?"línea":"bingo"}</p><ul class="list">${near.map(x=>`<li><span class="nm">Cartón ${pad(x.id)} · ${esc(ownerOf(x.id))}</span><span class="chip">faltan ${S.stage==="linea"?x.ev.lineLeft:x.ev.missing}</span></li>`).join("")}</ul>`:"")+`</div>`;
+      (wins.length?`<ul class="list">${wins.map(x=>`<li><span class="nm">Cartón ${pad(x.id)} · ${esc(ownerOf(x.id))}</span>${declared.has(x.id)?`<span class="chip">Ganador</span>`:`<button class="btn small primary" data-act="declare" data-id="${x.id}">${S.finished?"Agregar empate":"Dar premio"}</button>`}</li>`).join("")}</ul>`:`<p class="note" style="margin:0 0 8px">Ningún cartón repartido ha completado el patrón.</p>`)+
+      (near.length&&!S.finished?`<div class="sep"></div><p class="eyebrow" style="margin:0 0 6px">Cerca de ganar</p><ul class="list">${near.map(x=>`<li><span class="nm">Cartón ${pad(x.id)} · ${esc(ownerOf(x.id))}</span><span class="chip">faltan ${x.ev.left}</span></li>`).join("")}</ul>`:"")+`</div>`;
   }
   const voiceBtn=`<button class="btn small" data-act="voice">${voiceOn?"Voz activada":"Activar voz"}</button>`;
   const board=Array.from({length:90},(_,i)=>{const n=i+1;return `<span class="${cs.has(n)?"on":""}${n===last?" last":""}" style="--h:${hue(n)}">${n}</span>`}).join("");
-  const banner=S.finished?`<div class="banner" style="margin-bottom:18px"><span>Partida terminada. Ganador del bingo: ${esc((S.prizes[S.prizes.length-1]||{}).name||"")}</span></div>`:"";
-  return `<div class="hero"><div><div class="eyebrow">${esc(stageLabel())}</div><h1>${esc(S.title)}</h1></div>${voiceBtn}</div>${banner}
+  const banner=S.finished?`<div class="banner" style="margin-bottom:18px"><span>Partida ${S.round||1} terminada${S.prizes.length?". Ganó: "+esc(S.prizes.map(p=>p.name).join(", ")):""}</span>${hostMode?`<button class="btn small" data-act="open-round" style="color:var(--ink)">Nueva partida</button>`:""}</div>`:"";
+  return `<div class="hero"><div><div class="eyebrow">Partida ${S.round||1} · ${esc(patName(S.pattern))}</div><h1>${esc(S.title)}</h1></div>${voiceBtn}</div>${hostMode&&roundOpen?roundPanelHTML():""}${banner}
   <div class="layout"><div class="col">
     <section class="panel"><div class="live">${ballHTML(last,"big"+(pending==="new"?" pop":""))}
-      <div><span class="pill${live?" on":""}">${live?"En directo":S.called.length?"Finalizada":"Listo para empezar"}</span>
+      <div><span class="pill${live?" on":""}">${live?"En directo":S.finished?"Finalizada":S.called.length?"En pausa":"Listo para empezar"}</span>
       <div class="word" style="margin-top:8px">${last?words(last):"Esperando el primer número"}</div>
       <p class="muted" style="margin:2px 0 0">${S.called.length} cantados · quedan ${left}</p></div></div>${ctrl}
       ${recent.length?`<div class="sep"></div><p class="eyebrow" style="margin:0 0 8px">Anteriores</p><div class="hist">${recent.map(n=>ballHTML(n)).join("")}</div>`:""}
@@ -360,8 +461,9 @@ function salaHTML(){
     <section class="panel"><div class="eyebrow">Tablero</div><h2>Seguimiento de la partida</h2><div class="board">${board}</div>
       <div class="legend"><span>Coloreado: cantado</span><span>Contorno: último número</span><span>Gris: pendiente</span></div></section>
   </div><div class="col">
+    ${patternPanel()}
     <section class="panel"><div class="stat"><div><b>${S.players.length}</b><small>Jugadores</small></div><div><b>${assignedIds().size}/${S.count}</b><small>Cartones repartidos</small></div></div></section>
-    <section class="panel"><h3>Ganadores</h3>${prizes}</section>
+    <section class="panel"><h3>Ganador</h3>${prizes}${hist}</section>
     ${hostBox}${mineBox}
   </div></div>`;
 }
@@ -419,8 +521,8 @@ function ajustesHTML(){
     <label class="f">Cartones disponibles<input type="number" id="s-count" value="${S.count}" min="${assignedIds().size||1}" max="300"></label>
     <div><button class="btn primary" type="submit">Guardar</button></div></form></section></div>
   <div class="col"><section class="panel"><h2>Reiniciar</h2><div class="form">
-    <div><button class="btn danger" data-act="reset-nums">${c("rn")?"Confirmar: borrar números cantados":"Reiniciar números"}</button><p class="note">Borra los números cantados y los premios. Los cartones y el reparto se mantienen.</p></div>
-    <div><button class="btn danger" data-act="reset-cards">${c("rc")?"Confirmar: cartones nuevos":"Nueva partida con cartones nuevos"}</button><p class="note">Cambia todos los números de los cartones. Si ya imprimiste, tendrás que volver a imprimir.</p></div>
+    <div><button class="btn danger" data-act="reset-nums">${c("rn")?"Confirmar: borrar números cantados":"Reiniciar esta partida"}</button><p class="note">Borra los números cantados y el ganador de esta partida. Se mantienen el patrón, los cartones y el reparto.</p></div>
+    <div><button class="btn danger" data-act="reset-cards">${c("rc")?"Confirmar: cartones nuevos":"Cambiar todos los cartones"}</button><p class="note">Genera números nuevos en todos los cartones y reinicia la partida. Si ya imprimiste, tendrás que volver a imprimir.</p></div>
     <div><button class="btn" data-act="player-view">Ver como jugador</button></div></div></section></div></div>`;
 }
 
@@ -461,6 +563,8 @@ document.addEventListener("click",ev=>{
   if(act==="tab"){tab=b.dataset.tab;lsSet("bingo.tab",tab);confirmKey=null;render();window.scrollTo(0,0);return}
   if(act==="login"){showLogin=true;render();return}
   if(act==="logout"){isHost=false;asPlayer=false;HOSTKEY="";lsSet("bingo.hostkey","");stopAuto();tab="sala";render();return}
+  if(act==="pick-pat"){draft.id=b.dataset.id;if(draft.id==="custom"&&!draft.pieces.length)draft.pieces=["r0"];render();return}
+  if(act==="pick-piece"){const p=b.dataset.p,i=draft.pieces.indexOf(p);if(i>-1)draft.pieces.splice(i,1);else draft.pieces.push(p);render();return}
   if(!S&&act!=="host-view"&&act!=="voice")return;
   if(act==="draw"){pending="new";draw()}
   else if(act==="auto"){if(autoTimer){stopAuto();render()}else{pending="new";startAuto()}}
@@ -477,6 +581,9 @@ document.addEventListener("click",ev=>{
   else if(act==="csv")csvReparto();
   else if(act==="reset-nums"){if(confirmKey==="rn"){confirmKey=null;resetNumbers()}else{confirmKey="rn";render()}}
   else if(act==="reset-cards"){if(confirmKey==="rc"){confirmKey=null;newCards()}else{confirmKey="rc";render()}}
+  else if(act==="open-round"){const pt=S.pattern||{id:"linea"};draft={id:pt.id,pieces:(pt.pieces&&pt.pieces.length?pt.pieces:["r0"]).slice()};roundOpen=true;render()}
+  else if(act==="close-round"){roundOpen=false;render()}
+  else if(act==="apply-round")applyRound();
   else if(act==="player-view"){asPlayer=true;tab="sala";render()}
   else if(act==="host-view"){asPlayer=false;tab="sala";render()}
 });
@@ -491,7 +598,7 @@ document.addEventListener("submit",ev=>{
   }
   if(f==="f-create"){
     const title=$("#c-title").value.trim(),count=Math.max(1,Math.min(300,parseInt($("#c-count").value,10)||30));
-    S=newState(title,count);seenCalled=0;seenPrizes=0;commit();toast("Sala creada");
+    S=newState(title,count,draft.id==="custom"?{id:"custom",pieces:draft.pieces.slice()}:{id:draft.id});seenCalled=0;seenPrizes=0;commit();toast("Sala creada");
   }else if(f==="f-players"){
     const n=addPlayers($("#p-names").value,parseInt($("#p-per").value,10)||1);
     if(!n){toast("Escribe al menos un nombre");return}
@@ -508,14 +615,16 @@ document.addEventListener("input",ev=>{
   if(ev.target.id==="card-q"){cardQuery=ev.target.value;render()}
 });
 document.addEventListener("change",ev=>{
+  if(ev.target.id==="nr-new"){nrNew=ev.target.checked;return}
   if(ev.target.id==="auto-secs"){autoSecs=parseInt(ev.target.value,10)||8;lsSet("bingo.autosecs",autoSecs);if(autoTimer)startAuto()}
 });
 
 /* ---------- arranque ---------- */
 function onState(next){
   const prev=S;S=next;
+  if(S){if(!S.pattern)S.pattern={id:"linea"};if(!S.round)S.round=1;if(!S.history)S.history=[]}
   if(S&&seenCalled>=0&&S.called.length>seenCalled&&!(isHost&&!asPlayer)){pending="new";say(S.called[S.called.length-1])}
-  if(S&&seenPrizes>=0&&S.prizes.length>seenPrizes&&!(isHost&&!asPlayer)){const p=S.prizes[S.prizes.length-1];toast((p.stage==="linea"?"¡Línea! ":"¡Bingo! ")+p.name+" (cartón "+pad(p.card)+")")}
+  if(S&&seenPrizes>=0&&S.prizes.length>seenPrizes&&!(isHost&&!asPlayer)){const p=S.prizes[S.prizes.length-1];toast("¡Bingo! Ganó "+p.name+" (cartón "+pad(p.card)+")");}
   seenCalled=S?S.called.length:0;seenPrizes=S?S.prizes.length:0;
   ready=true;render();
 }
